@@ -1,5 +1,6 @@
 /target
 Cargo.lock
+.DS_Store
 
 # Development context (not for public repo)
 .claude/

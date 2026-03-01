@@ -14,16 +14,12 @@ keywords = ["lambert", "orbital-mechanics", "astrodynamics", "trajectory", "good
 categories = ["science"]
 
 [package.metadata.docs.rs]
-all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
 
 [features]
 gooding-ffi = ["dep:cc"]
 
 [dependencies]
-
-[dev-dependencies]
-lambert_solver = { git = "https://github.com/VisVivaSpace/ivLam2-rs", rev = "792a1644e273526a4701fe16c3f988b5407c7c1e" }
 
 [build-dependencies]
 cc = { version = "1", optional = true }
