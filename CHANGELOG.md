@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-03-01
+
 ### Added
 
 - `lambert` function implementing Gooding's (1990) method for Lambert's orbital
@@ -19,4 +21,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Algorithm reference documentation (`docs/gooding-lambert.md`)
 - LLM quick-start guide (`docs/llm-context.md`)
 
-[Unreleased]: https://github.com/nstrange/gooding-lambert/commits/main
+[Unreleased]: https://github.com/nstrange/gooding-lambert/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/nstrange/gooding-lambert/releases/tag/v0.1.0
