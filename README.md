@@ -15,27 +15,23 @@ gooding-lambert = "0.1.0"
 ## Quick Start
 
 ```rust
-use gooding_lambert::lambert;
+use gooding_lambert::{lambert, Direction};
 
-// Earth gravitational parameter (m³/s²)
-let mu = 3.986004418e14_f64;
+let mu = 398600.4418_f64;          // Earth GM (km³/s²)
+let r1 = [6678.0, 0.0, 0.0];      // LEO departure (km)
+let r2 = [0.0, 42164.0, 0.0];     // GEO arrival (km)
+let tof = 5.0 * 3600.0;           // 5 hours (seconds)
 
-// Departure position (m)
-let r1 = [7_000_000.0, 0.0, 0.0];
-// Arrival position (m)
-let r2 = [0.0, 7_000_000.0, 0.0];
-// Time of flight (s)
-let tof = 3600.0;
-
-let solution = lambert(mu, r1, r2, tof, 0).unwrap();
-println!("Departure v: {:?}", solution.v1);
-println!("Arrival v:   {:?}", solution.v2);
+let sol = lambert(mu, r1, r2, tof, 0, Direction::Prograde).unwrap();
+println!("Departure v: {:?}", sol.v1);  // km/s
+println!("Arrival v:   {:?}", sol.v2);  // km/s
 ```
 
 ## Documentation
 
 - [API Documentation](https://docs.rs/gooding-lambert)
 - [Algorithm Details](docs/algorithms/gooding-lambert.md)
+- [LLM Quick-Start Guide](docs/llm-context.md)
 
 ## Development
 

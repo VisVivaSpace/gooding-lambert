@@ -25,13 +25,15 @@ const C42: f64 = 0.24;
 fn tlamb(m: i32, q: f64, qsqfm1: f64, x: f64, n: i32) -> (f64, f64, f64, f64) {
     let m_f64 = m as f64;
 
-    if x.abs() == 1.0 {
-        return (0.0, 0.0, 0.0, 0.0);
-    }
-
     let qsq = q * q;
     let xsq = x * x;
     let u = (1.0 - x) * (1.0 + x); // = 1 - x²
+
+    // Guard: the direct path divides by u. The series path (m=0, x≥0, n≠-1)
+    // handles u→0 correctly; all other cases bail to avoid division by near-zero.
+    if u.abs() < 1e-10 && (n == -1 || m != 0 || x < 0.0) {
+        return (0.0, 0.0, 0.0, 0.0);
+    }
 
     // Series path: only for small-x elliptic region near parabolic limit.
     // Direct path used for: n=-1, m>0, x<0, or |u|>SW.
@@ -48,8 +50,7 @@ fn tlamb(m: i32, q: f64, qsqfm1: f64, x: f64, n: i32) -> (f64, f64, f64, f64) {
         } else {
             (1.0 / (1.0 + q) + q) * qsqfm1
         };
-        let ttmold_init = term / 3.0;
-        let mut ttmold = ttmold_init;
+        let mut ttmold = term / 3.0;
         let mut t = ttmold * tqsum;
         let mut dt = 0.0;
         let mut d2t = 0.0;
@@ -92,7 +93,7 @@ fn tlamb(m: i32, q: f64, qsqfm1: f64, x: f64, n: i32) -> (f64, f64, f64, f64) {
                 break;
             }
             if i > 200 {
-                break; // safety limit
+                panic!("tlamb: series did not converge after 200 iterations (x={x}, q={q}, qsqfm1={qsqfm1})");
             }
         }
 
@@ -191,7 +192,7 @@ fn tlamb(m: i32, q: f64, qsqfm1: f64, x: f64, n: i32) -> (f64, f64, f64, f64) {
     (t, dt, d2t, d3t)
 }
 
-/// Find the universal variable `x` for dimensionless time `tin`.
+/// Find Gooding's orbit parameter `x` for dimensionless time `tin`.
 ///
 /// `m` is the number of complete revolutions (0 for single arc).
 /// `nrev` selects long-period (> 0) or short-period (≤ 0) solution for m > 0.

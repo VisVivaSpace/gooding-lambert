@@ -10,6 +10,8 @@
 
 #![cfg(feature = "gooding-ffi")]
 
+mod common;
+
 use gooding_lambert::{lambert as rust_lambert, Direction};
 use std::f64::consts::PI;
 
@@ -60,46 +62,6 @@ fn cross_validate_c(label: &str, r1: [f64; 3], r2: [f64; 3], tof: f64, mu: f64) 
             ours.v2[i], cv2[i]
         );
     }
-}
-
-// ── PRNG (xorshift64, time-seeded) ─────────────────────────────────────────
-
-fn make_seed() -> u64 {
-    let d = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap();
-    // Mix seconds and nanoseconds for a seed that varies each run
-    let s = d.as_secs()
-        .wrapping_mul(6364136223846793005)
-        .wrapping_add(d.subsec_nanos() as u64);
-    if s == 0 { 1 } else { s }
-}
-
-fn xorshift(s: &mut u64) -> u64 {
-    *s ^= *s << 13;
-    *s ^= *s >> 7;
-    *s ^= *s << 17;
-    *s
-}
-
-fn rand_f64(s: &mut u64, lo: f64, hi: f64) -> f64 {
-    let bits = xorshift(s) >> 11; // 53 random bits
-    lo + (bits as f64 / (1u64 << 53) as f64) * (hi - lo)
-}
-
-/// Random 3D position vector: random direction, magnitude in [r_lo, r_hi].
-fn rand_r(s: &mut u64, r_lo: f64, r_hi: f64) -> [f64; 3] {
-    let r = rand_f64(s, r_lo, r_hi);
-    let theta = rand_f64(s, 0.0, PI);       // polar angle
-    let phi = rand_f64(s, 0.0, 2.0 * PI);  // azimuthal angle
-    [r * theta.sin() * phi.cos(), r * theta.sin() * phi.sin(), r * theta.cos()]
-}
-
-/// Cosine of the angle between two position vectors.
-fn cos_transfer_angle(r1: [f64; 3], r2: [f64; 3]) -> f64 {
-    let m1 = (r1[0] * r1[0] + r1[1] * r1[1] + r1[2] * r1[2]).sqrt();
-    let m2 = (r2[0] * r2[0] + r2[1] * r2[1] + r2[2] * r2[2]).sqrt();
-    (r1[0] * r2[0] + r1[1] * r2[1] + r1[2] * r2[2]) / (m1 * m2)
 }
 
 // ── Fixed regression tests ──────────────────────────────────────────────────
@@ -174,7 +136,7 @@ fn c_angle_sweep() {
 
 #[test]
 fn c_random_100() {
-    let mut seed = make_seed();
+    let mut seed = common::make_seed();
     eprintln!("c_random_100: seed = {seed}");
 
     const MU: f64 = 1.0;
@@ -191,20 +153,18 @@ fn c_random_100() {
             "c_random_100: gave up after {attempts} attempts (only {compared} compared); seed={seed}"
         );
 
-        let r1 = rand_r(&mut seed, 0.5, 5.0);
-        let r2 = rand_r(&mut seed, 0.5, 5.0);
+        let r1 = common::rand_r(&mut seed, 0.5, 5.0);
+        let r2 = common::rand_r(&mut seed, 0.5, 5.0);
 
         // Reject near-collinear: |cos θ| > cos(5°)
-        if cos_transfer_angle(r1, r2).abs() > NEAR_COLLINEAR {
+        if common::cos_transfer_angle(r1, r2).abs() > NEAR_COLLINEAR {
             continue;
         }
 
         // TOF: random fraction of mean circular orbit period [2%, 150%]
-        let m1 = (r1[0] * r1[0] + r1[1] * r1[1] + r1[2] * r1[2]).sqrt();
-        let m2 = (r2[0] * r2[0] + r2[1] * r2[1] + r2[2] * r2[2]).sqrt();
-        let r_mean = (m1 + m2) / 2.0;
+        let r_mean = (common::vec_mag(r1) + common::vec_mag(r2)) / 2.0;
         let t_circ = 2.0 * PI * (r_mean * r_mean * r_mean / MU).sqrt();
-        let tof = rand_f64(&mut seed, 0.02 * t_circ, 1.5 * t_circ);
+        let tof = common::rand_f64(&mut seed, 0.02 * t_circ, 1.5 * t_circ);
 
         let rust = rust_lambert(MU, r1, r2, tof, 0, Direction::Prograde);
         let c = c_lambert(MU, r1, r2, tof);

@@ -7,6 +7,8 @@
 //! The random tests use a time-based seed that changes every run; the seed is printed
 //! so that failures can be reproduced with `cargo test -- --nocapture`.
 
+mod common;
+
 use gooding_lambert::{lambert, Direction};
 use lambert_solver::{solve_lambert, Direction as IvDir};
 use std::f64::consts::PI;
@@ -40,46 +42,6 @@ fn cross_validate(label: &str, r1: [f64; 3], r2: [f64; 3], tof: f64, mu: f64, di
             ours.v2[i], theirs.v2[i]
         );
     }
-}
-
-// ── PRNG (xorshift64, time-seeded) ─────────────────────────────────────────
-
-fn make_seed() -> u64 {
-    let d = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap();
-    let s = d.as_secs()
-        .wrapping_mul(6364136223846793005)
-        .wrapping_add(d.subsec_nanos() as u64);
-    if s == 0 { 1 } else { s }
-}
-
-fn xorshift(s: &mut u64) -> u64 {
-    *s ^= *s << 13;
-    *s ^= *s >> 7;
-    *s ^= *s << 17;
-    *s
-}
-
-fn rand_f64(s: &mut u64, lo: f64, hi: f64) -> f64 {
-    let bits = xorshift(s) >> 11;
-    lo + (bits as f64 / (1u64 << 53) as f64) * (hi - lo)
-}
-
-/// Random 3D position vector: random direction, magnitude in [r_lo, r_hi].
-fn rand_r(s: &mut u64, r_lo: f64, r_hi: f64) -> [f64; 3] {
-    let r = rand_f64(s, r_lo, r_hi);
-    let theta = rand_f64(s, 0.0, PI);
-    let phi = rand_f64(s, 0.0, 2.0 * PI);
-    [r * theta.sin() * phi.cos(), r * theta.sin() * phi.sin(), r * theta.cos()]
-}
-
-fn vec_mag(v: [f64; 3]) -> f64 {
-    (v[0] * v[0] + v[1] * v[1] + v[2] * v[2]).sqrt()
-}
-
-fn cos_transfer_angle(r1: [f64; 3], r2: [f64; 3]) -> f64 {
-    (r1[0] * r2[0] + r1[1] * r2[1] + r1[2] * r2[2]) / (vec_mag(r1) * vec_mag(r2))
 }
 
 // ── Fixed regression tests ──────────────────────────────────────────────────
@@ -202,7 +164,7 @@ fn high_eccentricity_r10() {
 // Run with `cargo test -- --nocapture` to see seed and statistics.
 
 fn random_sweep(label: &str, dir: Direction, n: usize) {
-    let mut seed = make_seed();
+    let mut seed = common::make_seed();
     eprintln!("{label}: seed = {seed}");
 
     const MU: f64 = 1.0;
@@ -224,18 +186,18 @@ fn random_sweep(label: &str, dir: Direction, n: usize) {
             "{label}: gave up after {attempts} attempts ({compared} compared); seed={seed}"
         );
 
-        let r1 = rand_r(&mut seed, 0.5, 5.0);
-        let r2 = rand_r(&mut seed, 0.5, 5.0);
+        let r1 = common::rand_r(&mut seed, 0.5, 5.0);
+        let r2 = common::rand_r(&mut seed, 0.5, 5.0);
 
         // Reject near-collinear
-        if cos_transfer_angle(r1, r2).abs() > NEAR_COLLINEAR {
+        if common::cos_transfer_angle(r1, r2).abs() > NEAR_COLLINEAR {
             continue;
         }
 
         // TOF: fraction of mean circular orbit period
-        let r_mean = (vec_mag(r1) + vec_mag(r2)) / 2.0;
+        let r_mean = (common::vec_mag(r1) + common::vec_mag(r2)) / 2.0;
         let t_circ = 2.0 * PI * (r_mean * r_mean * r_mean / MU).sqrt();
-        let tof = rand_f64(&mut seed, 0.02 * t_circ, 1.5 * t_circ);
+        let tof = common::rand_f64(&mut seed, 0.02 * t_circ, 1.5 * t_circ);
 
         let ours = lambert(MU, r1, r2, tof, 0, dir);
         let theirs = solve_lambert(&r1, &r2, tof, MU, iv_dir, 0);

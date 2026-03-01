@@ -2,14 +2,12 @@
 //!
 //! Solve Lambert → propagate (r1, v1) forward by TOF → verify arrival at r2.
 
+mod common;
+
 use gooding_lambert::{lambert, Direction};
 use std::f64::consts::PI;
 
 // ── Kepler propagator (universal variable + Stumpff) ───────────────────────
-
-fn vec_mag(v: [f64; 3]) -> f64 {
-    (v[0] * v[0] + v[1] * v[1] + v[2] * v[2]).sqrt()
-}
 
 fn stumpff(psi: f64) -> (f64, f64) {
     if psi > 1e-6 {
@@ -24,7 +22,7 @@ fn stumpff(psi: f64) -> (f64, f64) {
 }
 
 fn kepler_propagate(r0: [f64; 3], v0: [f64; 3], dt: f64, mu: f64) -> ([f64; 3], [f64; 3]) {
-    let r0m = vec_mag(r0);
+    let r0m = common::vec_mag(r0);
     let v0sq = v0[0] * v0[0] + v0[1] * v0[1] + v0[2] * v0[2];
     let rdotv = r0[0] * v0[0] + r0[1] * v0[1] + r0[2] * v0[2];
     let alpha = 2.0 / r0m - v0sq / mu; // = 1/a (positive for elliptic)
@@ -96,9 +94,9 @@ fn round_trip(r1: [f64; 3], r2: [f64; 3], tof: f64, mu: f64, dir: Direction, tol
 
     let pos_err = {
         let d = [r2[0] - r2_prop[0], r2[1] - r2_prop[1], r2[2] - r2_prop[2]];
-        vec_mag(d)
+        common::vec_mag(d)
     };
-    let r2_mag = vec_mag(r2);
+    let r2_mag = common::vec_mag(r2);
     assert!(
         pos_err < tol * r2_mag,
         "position error {pos_err:.2e} (relative {:.2e}), tol={tol:.0e}",
@@ -112,9 +110,9 @@ fn round_trip(r1: [f64; 3], r2: [f64; 3], tof: f64, mu: f64, dir: Direction, tol
             sol.v2[1] - v2_prop[1],
             sol.v2[2] - v2_prop[2],
         ];
-        vec_mag(d)
+        common::vec_mag(d)
     };
-    let v2_mag = vec_mag(sol.v2);
+    let v2_mag = common::vec_mag(sol.v2);
     assert!(
         vel_err < tol * v2_mag,
         "velocity error {vel_err:.2e} (relative {:.2e}), tol={tol:.0e}",
