@@ -1,0 +1,8 @@
+/target
+Cargo.lock
+
+# Development context (not for public repo)
+.claude/
+CLAUDE.md
+tasks/
+notes/

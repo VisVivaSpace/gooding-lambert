@@ -1,0 +1,29 @@
+[package]
+name = "gooding-lambert"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+authors = ["Nathan Strange <info@visviva.space>"]
+description = "Gooding's method for solving Lambert's orbital boundary-value problem"
+license = "MIT"
+repository = "https://github.com/nstrange/gooding-lambert"
+documentation = "https://docs.rs/gooding-lambert"
+homepage = "https://github.com/nstrange/gooding-lambert"
+readme = "README.md"
+keywords = ["lambert", "orbital-mechanics", "astrodynamics", "trajectory", "gooding"]
+categories = ["science"]
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
+[features]
+gooding-ffi = ["dep:cc"]
+
+[dependencies]
+
+[dev-dependencies]
+lambert_solver = { git = "https://github.com/VisVivaSpace/ivLam2-rs" }
+
+[build-dependencies]
+cc = { version = "1", optional = true }
