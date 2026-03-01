@@ -549,7 +549,8 @@ mod tests {
         let sol = lambert(mu, r1, r2, PI / 2.0, 0, Direction::Prograde).unwrap();
         let e1 = energy(r1, sol.v1, mu);
         let e2 = energy(r2, sol.v2, mu);
-        assert!((e1 - e2).abs() < 1e-10, "energy: {e1} vs {e2}");
+        // Lambert converges to |δT| < 1e-12; energy error ~ v·δv ~ 1e-12
+        assert!((e1 - e2).abs() < 1e-12, "energy: {e1} vs {e2}");
     }
 
     #[test]
@@ -562,7 +563,8 @@ mod tests {
         let h1 = cross(r1, sol.v1);
         let h2 = cross(r2, sol.v2);
         for i in 0..3 {
-            assert!((h1[i] - h2[i]).abs() < 1e-10, "h[{i}]: {:.6e} vs {:.6e}", h1[i], h2[i]);
+            // |h| ~ 1; δh ~ |r|·δv ~ 1e-12
+            assert!((h1[i] - h2[i]).abs() < 1e-12, "h[{i}]: {:.6e} vs {:.6e}", h1[i], h2[i]);
         }
     }
 
@@ -651,7 +653,7 @@ mod tests {
         // Energy still conserved
         let e1 = energy(r1, sol.v1, mu);
         let e2 = energy(r2, sol.v2, mu);
-        assert!((e1 - e2).abs() < 1e-10, "3D energy: {e1} vs {e2}");
+        assert!((e1 - e2).abs() < 1e-12, "3D energy: {e1} vs {e2}");
     }
 
     #[test]

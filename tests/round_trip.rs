@@ -121,32 +121,42 @@ fn round_trip(r1: [f64; 3], r2: [f64; 3], tof: f64, mu: f64, dir: Direction, tol
 }
 
 // ── Tests ───────────────────────────────────────────────────────────────────
+//
+// Tolerance derivation (Tier 3 — iterative method):
+//   xlamb converges to |δT| < 1e-12 (relative to T).
+//   x → velocity through ~15 arithmetic ops: rounding error ~15ε ≈ 3e-15.
+//   Kepler propagator converges to |δchi| < 1e-14 * dt.max(1) (absolute).
+//   For the shortest test (dt = 0.1), that is 1e-14; for LEO→GEO (dt = 18 000),
+//   the chi error translates to position error ~3e-12 relative (see analysis in
+//   docs/algorithms/gooding-lambert.md).
+//   Net expected round-trip error: ~1e-12 relative.
+//   Test tolerance: 1e-11 (10× safety margin over expected 1e-12).
 
 #[test]
 fn circular_90_deg() {
-    round_trip([1.0, 0.0, 0.0], [0.0, 1.0, 0.0], PI / 2.0, 1.0, Direction::Prograde, 1e-8);
+    round_trip([1.0, 0.0, 0.0], [0.0, 1.0, 0.0], PI / 2.0, 1.0, Direction::Prograde, 1e-11);
 }
 
 #[test]
 fn circular_45_deg() {
     let a = PI / 4.0;
-    round_trip([1.0, 0.0, 0.0], [a.cos(), a.sin(), 0.0], a, 1.0, Direction::Prograde, 1e-8);
+    round_trip([1.0, 0.0, 0.0], [a.cos(), a.sin(), 0.0], a, 1.0, Direction::Prograde, 1e-11);
 }
 
 #[test]
 fn circular_150_deg() {
     let a = 150.0_f64.to_radians();
-    round_trip([1.0, 0.0, 0.0], [a.cos(), a.sin(), 0.0], a, 1.0, Direction::Prograde, 1e-8);
+    round_trip([1.0, 0.0, 0.0], [a.cos(), a.sin(), 0.0], a, 1.0, Direction::Prograde, 1e-11);
 }
 
 #[test]
 fn elliptic_different_radii() {
-    round_trip([1.0, 0.0, 0.0], [0.0, 1.5, 0.0], 2.0, 1.0, Direction::Prograde, 1e-8);
+    round_trip([1.0, 0.0, 0.0], [0.0, 1.5, 0.0], 2.0, 1.0, Direction::Prograde, 1e-11);
 }
 
 #[test]
 fn hyperbolic() {
-    round_trip([1.0, 0.0, 0.0], [0.0, 1.0, 0.0], 0.1, 1.0, Direction::Prograde, 1e-8);
+    round_trip([1.0, 0.0, 0.0], [0.0, 1.0, 0.0], 0.1, 1.0, Direction::Prograde, 1e-11);
 }
 
 #[test]
@@ -157,13 +167,13 @@ fn retrograde() {
         3.0 * PI / 2.0,
         1.0,
         Direction::Retrograde,
-        1e-8,
+        1e-11,
     );
 }
 
 #[test]
 fn three_dimensional() {
-    round_trip([1.0, 0.0, 0.0], [0.0, 0.8, 0.6], PI / 2.0, 1.0, Direction::Prograde, 1e-8);
+    round_trip([1.0, 0.0, 0.0], [0.0, 0.8, 0.6], PI / 2.0, 1.0, Direction::Prograde, 1e-11);
 }
 
 #[test]
@@ -175,6 +185,6 @@ fn physical_units_leo_to_geo() {
         5.0 * 3600.0,
         mu,
         Direction::Prograde,
-        1e-8,
+        1e-11,
     );
 }

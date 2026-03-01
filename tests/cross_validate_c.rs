@@ -15,7 +15,12 @@ mod common;
 use gooding_lambert::{lambert as rust_lambert, Direction};
 use std::f64::consts::PI;
 
-const TOL: f64 = 1e-10; // same algorithm — should agree very closely
+// Same algorithm (Rust vs C Gooding): differences come only from compiler
+// floating-point reordering / FMA decisions over ~50 arithmetic operations.
+// Expected agreement: ~50ε ≈ 1e-14. xlamb converges to |δT| < 1e-12 in both;
+// their x values should match to within that criterion.
+// Tolerance: 1e-12 (100× above expected 1e-14, catches compiler-divergence bugs).
+const TOL: f64 = 1e-12;
 
 // ── C FFI ───────────────────────────────────────────────────────────────────
 
@@ -48,20 +53,29 @@ fn cross_validate_c(label: &str, r1: [f64; 3], r2: [f64; 3], tof: f64, mu: f64) 
     let (cv1, cv2) = c_lambert(mu, r1, r2, tof)
         .unwrap_or_else(|| panic!("{label}: C solver returned no solution"));
 
-    for i in 0..3 {
-        let diff1 = (ours.v1[i] - cv1[i]).abs();
-        let diff2 = (ours.v2[i] - cv2[i]).abs();
-        assert!(
-            diff1 < TOL,
-            "{label}: v1[{i}] rust={:.15e} c={:.15e} diff={diff1:.2e}",
-            ours.v1[i], cv1[i]
-        );
-        assert!(
-            diff2 < TOL,
-            "{label}: v2[{i}] rust={:.15e} c={:.15e} diff={diff2:.2e}",
-            ours.v2[i], cv2[i]
-        );
-    }
+    // Relative comparison: |δv| / |v| < TOL
+    let v1_err = common::vec_mag([
+        ours.v1[0] - cv1[0],
+        ours.v1[1] - cv1[1],
+        ours.v1[2] - cv1[2],
+    ]);
+    let v2_err = common::vec_mag([
+        ours.v2[0] - cv2[0],
+        ours.v2[1] - cv2[1],
+        ours.v2[2] - cv2[2],
+    ]);
+    let v1_mag = common::vec_mag(ours.v1);
+    let v2_mag = common::vec_mag(ours.v2);
+    assert!(
+        v1_err < TOL * v1_mag,
+        "{label}: v1 relative error {:.2e} (|δv1|={v1_err:.2e}, |v1|={v1_mag:.2e})",
+        v1_err / v1_mag
+    );
+    assert!(
+        v2_err < TOL * v2_mag,
+        "{label}: v2 relative error {:.2e} (|δv2|={v2_err:.2e}, |v2|={v2_mag:.2e})",
+        v2_err / v2_mag
+    );
 }
 
 // ── Fixed regression tests ──────────────────────────────────────────────────
@@ -171,20 +185,28 @@ fn c_random_100() {
 
         match (rust, c) {
             (Ok(ours), Some((cv1, cv2))) => {
-                for i in 0..3 {
-                    let d1 = (ours.v1[i] - cv1[i]).abs();
-                    let d2 = (ours.v2[i] - cv2[i]).abs();
-                    assert!(
-                        d1 < TOL,
-                        "seed={seed} attempt={attempts}: v1[{i}] rust={:.15e} c={:.15e} diff={d1:.2e}\n  r1={r1:.6?} r2={r2:.6?} tof={tof:.6}",
-                        ours.v1[i], cv1[i]
-                    );
-                    assert!(
-                        d2 < TOL,
-                        "seed={seed} attempt={attempts}: v2[{i}] rust={:.15e} c={:.15e} diff={d2:.2e}\n  r1={r1:.6?} r2={r2:.6?} tof={tof:.6}",
-                        ours.v2[i], cv2[i]
-                    );
-                }
+                let v1_err = common::vec_mag([
+                    ours.v1[0] - cv1[0],
+                    ours.v1[1] - cv1[1],
+                    ours.v1[2] - cv1[2],
+                ]);
+                let v2_err = common::vec_mag([
+                    ours.v2[0] - cv2[0],
+                    ours.v2[1] - cv2[1],
+                    ours.v2[2] - cv2[2],
+                ]);
+                let v1_mag = common::vec_mag(ours.v1);
+                let v2_mag = common::vec_mag(ours.v2);
+                assert!(
+                    v1_err < TOL * v1_mag,
+                    "seed={seed} attempt={attempts}: v1 relative error {:.2e}\n  r1={r1:.6?} r2={r2:.6?} tof={tof:.6}",
+                    v1_err / v1_mag
+                );
+                assert!(
+                    v2_err < TOL * v2_mag,
+                    "seed={seed} attempt={attempts}: v2 relative error {:.2e}\n  r1={r1:.6?} r2={r2:.6?} tof={tof:.6}",
+                    v2_err / v2_mag
+                );
                 compared += 1;
             }
             // Both failed: geometry may be at an edge — acceptable
