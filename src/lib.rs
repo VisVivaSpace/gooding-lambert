@@ -10,14 +10,14 @@
 //! ## Quick Start
 //!
 //! ```
-//! use gooding_lambert::{lambert, Direction};
+//! use gooding_lambert::{lambert, Direction, MultiRevPeriod};
 //!
 //! let mu = 398600.4418_f64; // Earth GM (km³/s²)
 //! let r1 = [6678.0, 0.0, 0.0]; // km
 //! let r2 = [0.0, 42164.0, 0.0]; // km (GEO)
 //! let tof = 5.0 * 3600.0; // seconds
 //!
-//! let sol = lambert(mu, r1, r2, tof, 0, Direction::Prograde).unwrap();
+//! let sol = lambert(mu, r1, r2, tof, 0, Direction::Prograde, MultiRevPeriod::LongPeriod).unwrap();
 //! let speed = (sol.v1[0].powi(2) + sol.v1[1].powi(2) + sol.v1[2].powi(2)).sqrt();
 //! assert!(speed > 5.0 && speed < 15.0); // km/s at LEO departure
 //! ```
@@ -31,6 +31,7 @@ mod gooding;
 
 pub use gooding::gooding_lambert;
 pub use gooding::lambert;
+pub use gooding::MultiRevPeriod;
 
 /// Transfer direction for Lambert's problem.
 ///
@@ -67,3 +68,30 @@ pub enum LambertError {
     /// One or more inputs are invalid (zero radius, non-positive TOF, etc.).
     InvalidInput(&'static str),
 }
+
+impl std::fmt::Display for LambertError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            LambertError::SingularTransfer => {
+                write!(f, "transfer angle is exactly 180°; transfer plane is undefined")
+            }
+            LambertError::NoSolution => {
+                write!(
+                    f,
+                    "no solution exists for the given revolution count and time of flight"
+                )
+            }
+            LambertError::ConvergenceFailed => {
+                write!(
+                    f,
+                    "Householder iteration failed to converge within the iteration limit"
+                )
+            }
+            LambertError::InvalidInput(reason) => {
+                write!(f, "invalid input: {reason}")
+            }
+        }
+    }
+}
+
+impl std::error::Error for LambertError {}

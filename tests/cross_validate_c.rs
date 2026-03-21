@@ -12,7 +12,7 @@
 
 mod common;
 
-use gooding_lambert::{Direction, lambert as rust_lambert};
+use gooding_lambert::{Direction, MultiRevPeriod, lambert as rust_lambert};
 use std::f64::consts::PI;
 
 // Same algorithm (Rust vs C Gooding): differences come only from compiler
@@ -73,7 +73,7 @@ fn c_lambert_retro(mu: f64, r1: [f64; 3], r2: [f64; 3], tof: f64) -> Option<([f6
 // ── Test harness ─────────────────────────────────────────────────────────────
 
 fn cross_validate_c(label: &str, r1: [f64; 3], r2: [f64; 3], tof: f64, mu: f64) {
-    let ours = rust_lambert(mu, r1, r2, tof, 0, Direction::Prograde)
+    let ours = rust_lambert(mu, r1, r2, tof, 0, Direction::Prograde, MultiRevPeriod::LongPeriod)
         .unwrap_or_else(|e| panic!("{label}: Rust failed: {e:?}"));
     let (cv1, cv2) = c_lambert(mu, r1, r2, tof)
         .unwrap_or_else(|| panic!("{label}: C solver returned no solution"));
@@ -192,6 +192,8 @@ fn c_random_100() {
 
     let mut compared = 0usize;
     let mut attempts = 0usize;
+    let mut rust_only = 0usize; // Rust solved, C failed
+    let mut c_only = 0usize; // C solved, Rust failed
 
     while compared < 100 {
         attempts += 1;
@@ -213,7 +215,7 @@ fn c_random_100() {
         let t_circ = 2.0 * PI * (r_mean * r_mean * r_mean / MU).sqrt();
         let tof = common::rand_f64(&mut seed, 0.02 * t_circ, 1.5 * t_circ);
 
-        let rust = rust_lambert(MU, r1, r2, tof, 0, Direction::Prograde);
+        let rust = rust_lambert(MU, r1, r2, tof, 0, Direction::Prograde, MultiRevPeriod::LongPeriod);
         let c = c_lambert(MU, r1, r2, tof);
 
         match (rust, c) {
@@ -245,11 +247,15 @@ fn c_random_100() {
             // Both failed: geometry may be at an edge — acceptable
             (Err(_), None) => {}
             // One succeeded, other didn't: count but don't fail (investigate if frequent)
-            _ => {}
+            (Ok(_), None) => { rust_only += 1; }
+            (Err(_), Some(_)) => { c_only += 1; }
         }
     }
 
-    eprintln!("c_random_100: {compared} cases compared in {attempts} attempts (seed={seed})");
+    eprintln!(
+        "c_random_100: {compared} compared, {rust_only} rust-only, {c_only} c-only, \
+         {attempts} attempts (seed={seed})"
+    );
 }
 
 // ── Retrograde cross-validation ─────────────────────────────────────────────
@@ -258,7 +264,7 @@ fn c_random_100() {
 // this convention in gooding_lambert(). These tests verify agreement.
 
 fn cross_validate_c_retro(label: &str, r1: [f64; 3], r2: [f64; 3], tof: f64, mu: f64) {
-    let ours = rust_lambert(mu, r1, r2, tof, 0, Direction::Retrograde)
+    let ours = rust_lambert(mu, r1, r2, tof, 0, Direction::Retrograde, MultiRevPeriod::LongPeriod)
         .unwrap_or_else(|e| panic!("{label}: Rust failed: {e:?}"));
     let (cv1, cv2) = c_lambert_retro(mu, r1, r2, tof)
         .unwrap_or_else(|| panic!("{label}: C solver returned no solution"));
@@ -358,6 +364,8 @@ fn c_retro_random_100() {
 
     let mut compared = 0usize;
     let mut attempts = 0usize;
+    let mut rust_only = 0usize; // Rust solved, C failed
+    let mut c_only = 0usize; // C solved, Rust failed
 
     while compared < 100 {
         attempts += 1;
@@ -377,7 +385,7 @@ fn c_retro_random_100() {
         let t_circ = 2.0 * PI * (r_mean * r_mean * r_mean / MU).sqrt();
         let tof = common::rand_f64(&mut seed, 0.02 * t_circ, 1.5 * t_circ);
 
-        let rust = rust_lambert(MU, r1, r2, tof, 0, Direction::Retrograde);
+        let rust = rust_lambert(MU, r1, r2, tof, 0, Direction::Retrograde, MultiRevPeriod::LongPeriod);
         let c = c_lambert_retro(MU, r1, r2, tof);
 
         match (rust, c) {
@@ -407,9 +415,13 @@ fn c_retro_random_100() {
                 compared += 1;
             }
             (Err(_), None) => {}
-            _ => {}
+            (Ok(_), None) => { rust_only += 1; }
+            (Err(_), Some(_)) => { c_only += 1; }
         }
     }
 
-    eprintln!("c_retro_random_100: {compared} cases compared in {attempts} attempts (seed={seed})");
+    eprintln!(
+        "c_retro_random_100: {compared} compared, {rust_only} rust-only, {c_only} c-only, \
+         {attempts} attempts (seed={seed})"
+    );
 }
