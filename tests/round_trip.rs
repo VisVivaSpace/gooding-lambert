@@ -4,7 +4,7 @@
 
 mod common;
 
-use gooding_lambert::{lambert, Direction};
+use gooding_lambert::{Direction, lambert};
 use std::f64::consts::PI;
 
 // ── Kepler propagator (universal variable + Stumpff) ───────────────────────
@@ -17,7 +17,10 @@ fn stumpff(psi: f64) -> (f64, f64) {
         let sq = (-psi).sqrt();
         ((1.0 - sq.cosh()) / psi, (sq.sinh() - sq) / ((-psi) * sq))
     } else {
-        (0.5 - psi / 24.0 + psi * psi / 720.0, 1.0 / 6.0 - psi / 120.0 + psi * psi / 5040.0)
+        (
+            0.5 - psi / 24.0 + psi * psi / 720.0,
+            1.0 / 6.0 - psi / 120.0 + psi * psi / 5040.0,
+        )
     }
 }
 
@@ -46,9 +49,8 @@ fn kepler_propagate(r0: [f64; 3], v0: [f64; 3], dt: f64, mu: f64) -> ([f64; 3], 
     for _ in 0..50 {
         let psi = alpha * chi * chi;
         let (c2, c3) = stumpff(psi);
-        let r = chi * chi * c2
-            + rdotv / mu.sqrt() * chi * (1.0 - psi * c3)
-            + r0m * (1.0 - psi * c2);
+        let r =
+            chi * chi * c2 + rdotv / mu.sqrt() * chi * (1.0 - psi * c3) + r0m * (1.0 - psi * c2);
         let f_val = r0m * chi * (1.0 - psi * c3)
             + rdotv / mu.sqrt() * chi * chi * c2
             + chi * chi * chi * c3
@@ -62,9 +64,8 @@ fn kepler_propagate(r0: [f64; 3], v0: [f64; 3], dt: f64, mu: f64) -> ([f64; 3], 
 
     let psi = alpha * chi * chi;
     let (c2, c3) = stumpff(psi);
-    let r_mag = chi * chi * c2
-        + rdotv / mu.sqrt() * chi * (1.0 - psi * c3)
-        + r0m * (1.0 - psi * c2);
+    let r_mag =
+        chi * chi * c2 + rdotv / mu.sqrt() * chi * (1.0 - psi * c3) + r0m * (1.0 - psi * c2);
 
     let f = 1.0 - chi * chi / r0m * c2;
     let g = dt - chi * chi * chi / mu.sqrt() * c3;
@@ -87,8 +88,7 @@ fn kepler_propagate(r0: [f64; 3], v0: [f64; 3], dt: f64, mu: f64) -> ([f64; 3], 
 // ── Test harness ────────────────────────────────────────────────────────────
 
 fn round_trip(r1: [f64; 3], r2: [f64; 3], tof: f64, mu: f64, dir: Direction, tol: f64) {
-    let sol = lambert(mu, r1, r2, tof, 0, dir)
-        .unwrap_or_else(|e| panic!("Lambert failed: {e:?}"));
+    let sol = lambert(mu, r1, r2, tof, 0, dir).unwrap_or_else(|e| panic!("Lambert failed: {e:?}"));
 
     let (r2_prop, v2_prop) = kepler_propagate(r1, sol.v1, tof, mu);
 
@@ -134,29 +134,64 @@ fn round_trip(r1: [f64; 3], r2: [f64; 3], tof: f64, mu: f64, dir: Direction, tol
 
 #[test]
 fn circular_90_deg() {
-    round_trip([1.0, 0.0, 0.0], [0.0, 1.0, 0.0], PI / 2.0, 1.0, Direction::Prograde, 1e-11);
+    round_trip(
+        [1.0, 0.0, 0.0],
+        [0.0, 1.0, 0.0],
+        PI / 2.0,
+        1.0,
+        Direction::Prograde,
+        1e-11,
+    );
 }
 
 #[test]
 fn circular_45_deg() {
     let a = PI / 4.0;
-    round_trip([1.0, 0.0, 0.0], [a.cos(), a.sin(), 0.0], a, 1.0, Direction::Prograde, 1e-11);
+    round_trip(
+        [1.0, 0.0, 0.0],
+        [a.cos(), a.sin(), 0.0],
+        a,
+        1.0,
+        Direction::Prograde,
+        1e-11,
+    );
 }
 
 #[test]
 fn circular_150_deg() {
     let a = 150.0_f64.to_radians();
-    round_trip([1.0, 0.0, 0.0], [a.cos(), a.sin(), 0.0], a, 1.0, Direction::Prograde, 1e-11);
+    round_trip(
+        [1.0, 0.0, 0.0],
+        [a.cos(), a.sin(), 0.0],
+        a,
+        1.0,
+        Direction::Prograde,
+        1e-11,
+    );
 }
 
 #[test]
 fn elliptic_different_radii() {
-    round_trip([1.0, 0.0, 0.0], [0.0, 1.5, 0.0], 2.0, 1.0, Direction::Prograde, 1e-11);
+    round_trip(
+        [1.0, 0.0, 0.0],
+        [0.0, 1.5, 0.0],
+        2.0,
+        1.0,
+        Direction::Prograde,
+        1e-11,
+    );
 }
 
 #[test]
 fn hyperbolic() {
-    round_trip([1.0, 0.0, 0.0], [0.0, 1.0, 0.0], 0.1, 1.0, Direction::Prograde, 1e-11);
+    round_trip(
+        [1.0, 0.0, 0.0],
+        [0.0, 1.0, 0.0],
+        0.1,
+        1.0,
+        Direction::Prograde,
+        1e-11,
+    );
 }
 
 #[test]
@@ -164,7 +199,7 @@ fn retrograde() {
     round_trip(
         [1.0, 0.0, 0.0],
         [0.0, 1.0, 0.0],
-        3.0 * PI / 2.0,
+        PI / 2.0,
         1.0,
         Direction::Retrograde,
         1e-11,
@@ -173,7 +208,14 @@ fn retrograde() {
 
 #[test]
 fn three_dimensional() {
-    round_trip([1.0, 0.0, 0.0], [0.0, 0.8, 0.6], PI / 2.0, 1.0, Direction::Prograde, 1e-11);
+    round_trip(
+        [1.0, 0.0, 0.0],
+        [0.0, 0.8, 0.6],
+        PI / 2.0,
+        1.0,
+        Direction::Prograde,
+        1e-11,
+    );
 }
 
 #[test]
@@ -185,6 +227,58 @@ fn physical_units_leo_to_geo() {
         5.0 * 3600.0,
         mu,
         Direction::Prograde,
+        1e-11,
+    );
+}
+
+// ── Retrograde round-trip tests ─────────────────────────────────────────────
+
+#[test]
+fn retrograde_3d() {
+    round_trip(
+        [1.0, 0.0, 0.0],
+        [0.0, 0.8, 0.6],
+        PI / 2.0,
+        1.0,
+        Direction::Retrograde,
+        1e-11,
+    );
+}
+
+#[test]
+fn retrograde_different_radii() {
+    round_trip(
+        [1.0, 0.0, 0.0],
+        [0.0, 1.5, 0.0],
+        2.0,
+        1.0,
+        Direction::Retrograde,
+        1e-11,
+    );
+}
+
+#[test]
+fn retrograde_135_deg() {
+    let a = 135.0_f64.to_radians();
+    round_trip(
+        [1.0, 0.0, 0.0],
+        [a.cos(), a.sin(), 0.0],
+        a,
+        1.0,
+        Direction::Retrograde,
+        1e-11,
+    );
+}
+
+#[test]
+fn retrograde_leo_to_geo() {
+    let mu = 398600.4418;
+    round_trip(
+        [6678.0, 0.0, 0.0],
+        [0.0, 42164.0, 0.0],
+        5.0 * 3600.0,
+        mu,
+        Direction::Retrograde,
         1e-11,
     );
 }

@@ -19,6 +19,8 @@ void tlamb(int m, double q, double qsqfm1, double x, int n,
 int xlamb(int m, double q, double qsqfm1, double tin, double *x, double *xpl);
 int vlamb(double gm, double r1, double r2, double th, int nrev, double tdelt,
           double v1[2], double v2[2]);
+int lambert(double gm, double r1[3], double r2[3], int nrev, double tdelt,
+            double v1[3], double v2[3]);
 
 void tlamb (int m, double q, double qsqfm1, double x, int n, double *t, double *dt, double *d2t, double *d3t) {
     
@@ -315,80 +317,7 @@ int vlamb (double gm, double r1, double r2, double th, int nrev, double tdelt,
     return code;
 }
 
-int vlamb2 (double gm, double r1, double r2, double th, int nrev, double tdelt, 
-           double v11[2], double v12[2], double v21[2], double v22[2]) 
-{
-    
-    /* let th be positive for prograde, neg for retrograde */
-    
-    int m = abs(nrev);
-    
-    double thr2;
-    thr2 = th/2.0;
-    
-    double dr;
-    dr = r1-r2;
-    
-    double r1r2th;
-    r1r2th = 4.0*r1*r2*pow(sin(thr2),2);
-    
-    double csq;
-    csq = dr*dr + r1r2th;
-    
-    double c;
-    c = sqrt(csq);
-    
-    double s;
-    s = (r1+r2+c)/2.0;
-    
-    double gms;
-    gms = sqrt(gm*s/2.0);
-    
-    double qsqfm1;
-    qsqfm1 = c/s;
-    
-    double q;
-    q = sqrt(r1*r2)*cos(thr2)/s; 
-    double rho, sig;  
-    if (c) {
-        rho = dr/c;
-        sig = r1r2th/csq;
-    } else {
-        rho = 0.0;
-        sig = 1.0;
-    }
-    
-    double t;
-    t = 4.0*gms*tdelt/(s*s);
-    
-    double x1,x2;
-    int code = xlamb(m,q,qsqfm1,t,&x1,&x2);
-    
-    double unused,qzminx,qzplx,zplqx;
-    
-    if (code > 0) {
-        tlamb(m,q,qsqfm1,x1,-1,&unused,&qzminx,&qzplx,&zplqx);    
-        
-        v11[0] = gms*(qzminx-qzplx*rho)/r1;
-        v11[1] = gms*zplqx*sqrt(sig); 
-        v12[0] = -gms*(qzminx+qzplx*rho)/r2;
-        v12[1] = v11[1]/r2;
-        v11[1] = v11[1]/r1;
-        if (code > 1) {
-            tlamb(m,q,qsqfm1,x2,-1,&unused,&qzminx,&qzplx,&zplqx);    
-            
-            v21[0] = gms*(qzminx-qzplx*rho)/r1;
-            v21[1] = gms*zplqx*sqrt(sig); 
-            v22[0] = -gms*(qzminx+qzplx*rho)/r2;
-            v22[1] = v21[0]/r2;
-            v21[1] = v21[0]/r1;
-        }
-    }
-    
-    return code;
-}
-
-int lambert (double gm, double r1[3], double r2[3], int nrev, double tdelt, 
+int lambert (double gm, double r1[3], double r2[3], int nrev, double tdelt,
            double v1[3], double v2[3]) 
 {
     /* let nrev be negative for short period, pos for long period */
@@ -400,11 +329,20 @@ int lambert (double gm, double r1[3], double r2[3], int nrev, double tdelt,
     rad2 = sqrt(r2[0]*r2[0]+r2[1]*r2[1]+r2[2]*r2[2]);
     
     th = acos((r1[0]*r2[0]+r1[1]*r2[1]+r1[2]*r2[2])/(rad1*rad2));
-    if (th<0) {
-        th = th + TWOPI;
+
+    /* Retrograde convention: negative tdelt requests retrograde transfer.
+     * For retrograde, use the supplementary angle (th > pi) so that
+     * cos(th/2) goes negative, flipping q negative in vlamb.
+     * Pass |tdelt| to vlamb since time-of-flight is always positive. */
+    double tof;
+    if (tdelt < 0.0) {
+        th = TWOPI - th;
+        tof = -tdelt;
+    } else {
+        tof = tdelt;
     }
 
-    int code = vlamb (gm,rad1,rad2,th,nrev,tdelt,va1,va2);    
+    int code = vlamb (gm,rad1,rad2,th,nrev,tof,va1,va2);
 
     if (code > 0 ) {
         
@@ -430,7 +368,16 @@ int lambert (double gm, double r1[3], double r2[3], int nrev, double tdelt,
         } else {
             z[0] = z[0]/zm;
             z[1] = z[1]/zm;
-            z[2] = z[2]/zm; 
+            z[2] = z[2]/zm;
+        }
+
+        /* For retrograde transfers, flip the orbit plane normal.
+         * r1 x r2 gives the prograde normal; retrograde orbits
+         * have angular momentum in the opposite direction. */
+        if (tdelt < 0.0) {
+            z[0] = -z[0];
+            z[1] = -z[1];
+            z[2] = -z[2];
         }
 
         
@@ -452,59 +399,4 @@ int lambert (double gm, double r1[3], double r2[3], int nrev, double tdelt,
     }
     
     return code;
-}
-
-
-int vlamb_test (double gm, double r1, double r2, double th, int nrev, double tdelt, 
-                double v1[2], double v2[2]) 
-{
-    double vm1sq,vm2sq,en1,en2,am1,am2;
-    int ok=1;
-     
-    int m = abs(nrev);
-    double M = (double)m;
-    
-    vm1sq = v1[0]*v1[0]+v1[1]*v1[1];
-    vm2sq = v2[0]*v2[0]+v2[1]*v2[1];
-    
-    en1 = 0.5*vm1sq-gm/r1;
-    en2 = 0.5*vm2sq-gm/r2;
-    
-    am1 = r1*v1[1];
-    am2 = r2*v2[1];
-    
-    double sma,ecc,ea1,ea2,per,tfp1,tfp2;
-    
-    sma = -gm/2/en1;
-    per = TWOPI*sqrt(sma*sma*sma/gm);
-    ecc = sqrt(1-am1*am1/gm/sma);
-    ea1 = sign(v1[1])*acos((1-r1/sma)/ecc);
-    ea2 = sign(v2[1])*acos((1-r2/sma)/ecc);
-    double mm = sqrt(gm/sma/sma/sma);
-    tfp1 = (ea1-ecc*sin(ea1))/mm;
-    tfp2 = (ea2-ecc*sin(ea2))/mm;
-    if (tfp2<tfp1) {
-        tfp2 = tfp2+per;
-    }
-   
-    
-    ok = ok&&(am1==am2);
-   
-    if (!ok) {
-    printf("Ang. Mom. Error: %6.3g \n",(am1-am2));
-    }
-    
-    ok = ok&&(fabs(en1-en2)<TOL);
-    
-    if (!ok) {
-    printf("Energy Error: %6.3g \n",(en1-en2));
-    }
-    
-    ok = ok&&(fabs(1-((tfp2-tfp1+M*per)/tdelt))<TOL);
-    
-    if (!ok) {
-    printf("TOF Error: %6.3g \n",(1-((tfp2-tfp1+M*per)/tdelt)));
-    }
-  
-    return ok;
 }

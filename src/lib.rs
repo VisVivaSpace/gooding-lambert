@@ -29,6 +29,7 @@
 
 mod gooding;
 
+pub use gooding::gooding_lambert;
 pub use gooding::lambert;
 
 /// Transfer direction for Lambert's problem.

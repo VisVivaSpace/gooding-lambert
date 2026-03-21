@@ -1,6 +1,7 @@
 /target
 Cargo.lock
 .DS_Store
+*.vvas
 
 # Development context (not for public repo)
 .claude/

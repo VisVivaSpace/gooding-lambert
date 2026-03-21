@@ -93,7 +93,9 @@ fn tlamb(m: i32, q: f64, qsqfm1: f64, x: f64, n: i32) -> (f64, f64, f64, f64) {
                 break;
             }
             if i > 200 {
-                panic!("tlamb: series did not converge after 200 iterations (x={x}, q={q}, qsqfm1={qsqfm1})");
+                panic!(
+                    "tlamb: series did not converge after 200 iterations (x={x}, q={q}, qsqfm1={qsqfm1})"
+                );
             }
         }
 
@@ -213,14 +215,13 @@ fn xlamb(m: i32, q: f64, qsqfm1: f64, tin: f64, nrev: i32) -> Result<f64, Lamber
             let mut x = -tdiff / (tdiff + 4.0);
             let w = x + C0 * (2.0 * (1.0 - thr2)).sqrt();
             if w < 0.0 {
-                x -= (-w).sqrt().sqrt().sqrt().sqrt()
-                    * (x + (tdiff / (tdiff + 1.5 * t0)).sqrt());
+                x -= (-w).sqrt().sqrt().sqrt().sqrt() * (x + (tdiff / (tdiff + 1.5 * t0)).sqrt());
             }
             let w = 4.0 / (4.0 + tdiff);
             x * (1.0 + x * (C1 * w - C2 * x * w.sqrt()))
         };
 
-        // Householder order-2 refinement
+        // Householder order-2 refinement (3 iterations, matching C)
         for _ in 0..3 {
             let (t, dt, d2t, _) = tlamb(m, q, qsqfm1, x, 2);
             let t_err = tin - t;
@@ -229,12 +230,7 @@ fn xlamb(m: i32, q: f64, qsqfm1: f64, tin: f64, nrev: i32) -> Result<f64, Lamber
             }
         }
 
-        // Convergence check
-        let (t_final, _, _, _) = tlamb(m, q, qsqfm1, x, 0);
-        if (tin - t_final).abs() < TOL * tin.max(1.0) {
-            return Ok(x);
-        }
-        return Err(LambertError::ConvergenceFailed);
+        return Ok(x);
     }
 
     // Multi-rev: find T_min at x_min via Householder order-3 on d²T/dx² = 0
@@ -284,10 +280,11 @@ fn xlamb(m: i32, q: f64, qsqfm1: f64, tin: f64, nrev: i32) -> Result<f64, Lamber
         let mut x = (tdiffm / (d2t2 + tdiffm / ((1.0 - xm).powi(2)))).sqrt();
         let w = xm + x;
         let w = w * 4.0 / (4.0 + tdiffm) + (1.0 - w).powi(2);
-        x = x * (1.0
-            - (1.0 + m_f64 + C41 * (thr2 - 0.5)) / (1.0 + C3 * m_f64)
-                * x
-                * (C1 * w + C2 * x * w.sqrt()))
+        x = x
+            * (1.0
+                - (1.0 + m_f64 + C41 * (thr2 - 0.5)) / (1.0 + C3 * m_f64)
+                    * x
+                    * (C1 * w + C2 * x * w.sqrt()))
             + xm;
         x
     } else {
@@ -301,8 +298,7 @@ fn xlamb(m: i32, q: f64, qsqfm1: f64, tin: f64, nrev: i32) -> Result<f64, Lamber
             let mut x = -tdiff / (tdiff + 4.0);
             let w = x + C0 * (2.0 * (1.0 - thr2)).sqrt();
             if w < 0.0 {
-                x -= (-w).sqrt().sqrt().sqrt().sqrt()
-                    * (x + (tdiff / (tdiff + 1.5 * t0)).sqrt());
+                x -= (-w).sqrt().sqrt().sqrt().sqrt() * (x + (tdiff / (tdiff + 1.5 * t0)).sqrt());
             }
             let w = 4.0 / (4.0 + tdiff);
             x * (1.0
@@ -330,57 +326,6 @@ fn xlamb(m: i32, q: f64, qsqfm1: f64, tin: f64, nrev: i32) -> Result<f64, Lamber
     }
 }
 
-/// Solve Lambert in the 2D radial-transverse frame.
-///
-/// `th` is the transfer angle in radians (0 to 2π; > π for retrograde long-arc).
-/// `nrev` is the revolution count with sign: > 0 = long-period, ≤ 0 = short-period.
-/// Returns `([v_radial, v_transverse]` at r1 and r2.
-fn vlamb(
-    gm: f64,
-    r1: f64,
-    r2: f64,
-    th: f64,
-    nrev: i32,
-    tdelt: f64,
-) -> Result<([f64; 2], [f64; 2]), LambertError> {
-    let m = nrev.unsigned_abs() as i32;
-
-    let thr2 = th / 2.0;
-    let dr = r1 - r2;
-    let r1r2th = 4.0 * r1 * r2 * thr2.sin().powi(2);
-    let csq = dr * dr + r1r2th;
-    let c = csq.sqrt();
-    let s = (r1 + r2 + c) / 2.0;
-    let gms = (gm * s / 2.0).sqrt();
-    let qsqfm1 = c / s;
-    let q = (r1 * r2).sqrt() * thr2.cos() / s;
-
-    let (rho, sig) = if c > 1e-14 {
-        (dr / c, r1r2th / csq)
-    } else {
-        (0.0, 1.0)
-    };
-
-    let t = 4.0 * gms * tdelt / (s * s);
-
-    let x = xlamb(m, q, qsqfm1, t, nrev)?;
-
-    // Recover velocity components via tlamb(n=-1)
-    // Returns (0, qzminx, qzplx, zplqx)
-    let (_, qzminx, qzplx, zplqx) = tlamb(m, q, qsqfm1, x, -1);
-
-    let v1 = [
-        gms * (qzminx - qzplx * rho) / r1,
-        gms * zplqx * sig.sqrt() / r1,
-    ];
-    let v2 = [
-        -gms * (qzminx + qzplx * rho) / r2,
-        gms * zplqx * sig.sqrt() / r2,
-    ];
-
-    Ok((v1, v2))
-}
-
 /// Solve Lambert's problem using Gooding's (1990) method.
 ///
 /// # Parameters
@@ -406,96 +351,205 @@ pub fn lambert(
     nrev: u32,
     dir: Direction,
 ) -> Result<LambertSolution, LambertError> {
-    // Input validation
+    // --- Input validation (keep in wrapper, not in gooding_lambert) ---
     if !mu.is_finite() || mu <= 0.0 {
         return Err(LambertError::InvalidInput("mu must be finite and positive"));
     }
     if !tof.is_finite() || tof <= 0.0 {
-        return Err(LambertError::InvalidInput("tof must be finite and positive"));
+        return Err(LambertError::InvalidInput(
+            "tof must be finite and positive",
+        ));
     }
     for &v in r1.iter().chain(r2.iter()) {
         if !v.is_finite() {
-            return Err(LambertError::InvalidInput("position vector contains non-finite value"));
+            return Err(LambertError::InvalidInput(
+                "position vector contains non-finite value",
+            ));
         }
     }
-
     let r1_mag = (r1[0] * r1[0] + r1[1] * r1[1] + r1[2] * r1[2]).sqrt();
     let r2_mag = (r2[0] * r2[0] + r2[1] * r2[1] + r2[2] * r2[2]).sqrt();
-
-    if r1_mag < 1e-10 * (r2_mag.max(1.0)) {
-        return Err(LambertError::InvalidInput("r1 has zero or near-zero magnitude"));
+    if r1_mag < 1e-10 * r2_mag.max(1.0) {
+        return Err(LambertError::InvalidInput(
+            "r1 has zero or near-zero magnitude",
+        ));
     }
-    if r2_mag < 1e-10 * (r1_mag.max(1.0)) {
-        return Err(LambertError::InvalidInput("r2 has zero or near-zero magnitude"));
+    if r2_mag < 1e-10 * r1_mag.max(1.0) {
+        return Err(LambertError::InvalidInput(
+            "r2 has zero or near-zero magnitude",
+        ));
     }
 
-    // Transfer angle from [0, π]
+    // Check for 180-degree singularity (gooding_lambert uses fallback z=[0,0,1]
+    // which gives a "solution" that is physically meaningless — catch it here)
     let cos_th = (r1[0] * r2[0] + r1[1] * r2[1] + r1[2] * r2[2]) / (r1_mag * r2_mag);
-    let cos_th = cos_th.clamp(-1.0, 1.0);
-
-    // Singular at exactly 180° (transfer plane undefined)
     if cos_th <= -1.0 + 1e-10 {
         return Err(LambertError::SingularTransfer);
     }
-
-    let mut th = cos_th.acos(); // ∈ [0, π]
-
-    // Transfer plane normal: z = r1 × r2 (prograde) or r2 × r1 (retrograde)
-    let mut z = [
+    let cross_z = [
         r1[1] * r2[2] - r1[2] * r2[1],
         r1[2] * r2[0] - r1[0] * r2[2],
         r1[0] * r2[1] - r1[1] * r2[0],
     ];
-    let zm = (z[0] * z[0] + z[1] * z[1] + z[2] * z[2]).sqrt();
-
-    if zm < 1e-10 * r1_mag * r2_mag {
+    let cross_z_mag =
+        (cross_z[0] * cross_z[0] + cross_z[1] * cross_z[1] + cross_z[2] * cross_z[2]).sqrt();
+    if cross_z_mag < 1e-10 * r1_mag * r2_mag {
         return Err(LambertError::SingularTransfer);
     }
-    z[0] /= zm;
-    z[1] /= zm;
-    z[2] /= zm;
 
-    // Retrograde: use supplementary arc (th → 2π - th) and flip normal
-    if dir == Direction::Retrograde {
-        th = TWOPI - th;
-        z[0] = -z[0];
-        z[1] = -z[1];
-        z[2] = -z[2];
+    let nrev_signed = nrev as i32; // positive = long-period (matches current behavior)
+
+    // Encode direction as sign of tdelt: positive = prograde, negative = retrograde.
+    // gooding_lambert handles retrograde internally (supplementary angle + flipped normal).
+    let signed_tdelt = match dir {
+        Direction::Prograde => tof,
+        Direction::Retrograde => -tof,
+    };
+
+    let mut v1 = [0.0_f64; 3];
+    let mut v2 = [0.0_f64; 3];
+    let code = gooding_lambert(mu, &r1, &r2, nrev_signed, signed_tdelt, &mut v1, &mut v2);
+    match code {
+        c if c > 0 => Ok(LambertSolution { v1, v2 }),
+        0 => Err(LambertError::NoSolution),
+        _ => Err(LambertError::ConvergenceFailed),
+    }
+}
+
+/// Internal helper for [`gooding_lambert`]: solve in the 2D radial-transverse frame
+/// using C-matching signed conventions for `nrev` and `tdelt`.
+#[allow(clippy::too_many_arguments)]
+fn vlamb_c(
+    gm: f64,
+    r1: f64,
+    r2: f64,
+    th: f64,
+    nrev: i32,
+    tdelt: f64,
+    v1: &mut [f64; 2],
+    v2: &mut [f64; 2],
+) -> i32 {
+    let m = nrev.unsigned_abs() as i32;
+    let thr2 = th / 2.0;
+    let dr = r1 - r2;
+    let r1r2th = 4.0 * r1 * r2 * thr2.sin().powi(2);
+    let csq = dr * dr + r1r2th;
+    let c = csq.sqrt();
+    let s = (r1 + r2 + c) / 2.0;
+    let gms = (gm * s / 2.0).sqrt();
+    let qsqfm1 = c / s;
+    let q = (r1 * r2).sqrt() * thr2.cos() / s;
+
+    let (rho, sig) = if c > 1e-14 {
+        (dr / c, r1r2th / csq)
+    } else {
+        (0.0, 1.0)
+    };
+
+    let t = 4.0 * gms * tdelt / (s * s);
+
+    let x = match xlamb(m, q, qsqfm1, t, nrev) {
+        Ok(x) => x,
+        Err(LambertError::NoSolution) => return 0,
+        Err(_) => return -1,
+    };
+
+    let (_, qzminx, qzplx, zplqx) = tlamb(m, q, qsqfm1, x, -1);
+
+    // C evaluation order: compute intermediate, then divide
+    v1[1] = gms * zplqx * sig.sqrt();
+    v2[1] = v1[1] / r2;
+    v1[1] /= r1;
+    v1[0] = gms * (qzminx - qzplx * rho) / r1;
+    v2[0] = -gms * (qzminx + qzplx * rho) / r2;
+
+    1
+}
+
+/// Solve Lambert's problem using Gooding's method with C-matching signature.
+///
+/// This function replicates the logic path of the C `lambert()` function.
+/// It uses `nrev` as signed `i32` (sign = period selection) and `tdelt` as
+/// signed `f64` (sign = direction), passing both directly to the internal solver.
+///
+/// Returns a status code: 1 on success, 0 if no solution exists, -1 on error.
+pub fn gooding_lambert(
+    gm: f64,
+    r1: &[f64; 3],
+    r2: &[f64; 3],
+    nrev: i32,
+    tdelt: f64,
+    v1: &mut [f64; 3],
+    v2: &mut [f64; 3],
+) -> i32 {
+    let rad1 = (r1[0] * r1[0] + r1[1] * r1[1] + r1[2] * r1[2]).sqrt();
+    let rad2 = (r2[0] * r2[0] + r2[1] * r2[1] + r2[2] * r2[2]).sqrt();
+
+    let dot = r1[0] * r2[0] + r1[1] * r2[1] + r1[2] * r2[2];
+    let th = (dot / (rad1 * rad2)).clamp(-1.0, 1.0).acos();
+
+    let mut va1 = [0.0_f64; 2];
+    let mut va2 = [0.0_f64; 2];
+
+    // Retrograde convention (C-matching): negative tdelt requests retrograde.
+    // Use supplementary angle so cos(th/2) goes negative (flips q in vlamb_c),
+    // pass |tdelt| since time-of-flight is always positive, and flip the orbit
+    // normal for 3D reconstruction.
+    let retrograde = tdelt < 0.0;
+    let (th, tdelt) = if retrograde {
+        (TWOPI - th, tdelt.abs())
+    } else {
+        (th, tdelt)
+    };
+
+    let code = vlamb_c(gm, rad1, rad2, th, nrev, tdelt, &mut va1, &mut va2);
+
+    if code > 0 {
+        let x1 = [r1[0] / rad1, r1[1] / rad1, r1[2] / rad1];
+        let x2 = [r2[0] / rad2, r2[1] / rad2, r2[2] / rad2];
+
+        let mut z = [
+            x1[1] * x2[2] - x1[2] * x2[1],
+            x1[2] * x2[0] - x1[0] * x2[2],
+            x1[0] * x2[1] - x1[1] * x2[0],
+        ];
+        let zm = (z[0] * z[0] + z[1] * z[1] + z[2] * z[2]).sqrt();
+
+        if zm < 1e-10 {
+            z = [0.0, 0.0, 1.0];
+        } else {
+            z[0] /= zm;
+            z[1] /= zm;
+            z[2] /= zm;
+        }
+
+        // Retrograde: flip orbit normal so angular momentum is antiparallel to r1 × r2.
+        if retrograde {
+            z[0] = -z[0];
+            z[1] = -z[1];
+            z[2] = -z[2];
+        }
+
+        let y1 = [
+            z[1] * x1[2] - z[2] * x1[1],
+            z[2] * x1[0] - z[0] * x1[2],
+            z[0] * x1[1] - z[1] * x1[0],
+        ];
+        let y2 = [
+            z[1] * x2[2] - z[2] * x2[1],
+            z[2] * x2[0] - z[0] * x2[2],
+            z[0] * x2[1] - z[1] * x2[0],
+        ];
+
+        v1[0] = va1[0] * x1[0] + va1[1] * y1[0];
+        v1[1] = va1[0] * x1[1] + va1[1] * y1[1];
+        v1[2] = va1[0] * x1[2] + va1[1] * y1[2];
+        v2[0] = va2[0] * x2[0] + va2[1] * y2[0];
+        v2[1] = va2[0] * x2[1] + va2[1] * y2[1];
+        v2[2] = va2[0] * x2[2] + va2[1] * y2[2];
     }
 
-    // Solve 2D; nrev > 0 → long-period, 0 → single arc
-    let nrev_c = nrev as i32;
-    let (va1, va2) = vlamb(mu, r1_mag, r2_mag, th, nrev_c, tof)?;
-
-    // Build orthonormal frame: x (radial), y (transverse), z (orbit normal)
-    let x1 = [r1[0] / r1_mag, r1[1] / r1_mag, r1[2] / r1_mag];
-    let x2 = [r2[0] / r2_mag, r2[1] / r2_mag, r2[2] / r2_mag];
-
-    // y = z × x (transverse direction at each endpoint)
-    let y1 = [
-        z[1] * x1[2] - z[2] * x1[1],
-        z[2] * x1[0] - z[0] * x1[2],
-        z[0] * x1[1] - z[1] * x1[0],
-    ];
-    let y2 = [
-        z[1] * x2[2] - z[2] * x2[1],
-        z[2] * x2[0] - z[0] * x2[2],
-        z[0] * x2[1] - z[1] * x2[0],
-    ];
-
-    // Rotate 2D [radial, transverse] into 3D
-    let v1 = [
-        va1[0] * x1[0] + va1[1] * y1[0],
-        va1[0] * x1[1] + va1[1] * y1[1],
-        va1[0] * x1[2] + va1[1] * y1[2],
-    ];
-    let v2 = [
-        va2[0] * x2[0] + va2[1] * y2[0],
-        va2[0] * x2[1] + va2[1] * y2[1],
-        va2[0] * x2[2] + va2[1] * y2[2],
-    ];
-
-    Ok(LambertSolution { v1, v2 })
+    code
 }
 
 #[cfg(test)]
@@ -564,7 +618,12 @@ mod tests {
         let h2 = cross(r2, sol.v2);
         for i in 0..3 {
             // |h| ~ 1; δh ~ |r|·δv ~ 1e-12
-            assert!((h1[i] - h2[i]).abs() < 1e-12, "h[{i}]: {:.6e} vs {:.6e}", h1[i], h2[i]);
+            assert!(
+                (h1[i] - h2[i]).abs() < 1e-12,
+                "h[{i}]: {:.6e} vs {:.6e}",
+                h1[i],
+                h2[i]
+            );
         }
     }
 
@@ -576,18 +635,27 @@ mod tests {
         let r2 = [0.0, 1.0, 0.0];
         let sol = lambert(mu, r1, r2, PI / 2.0, 0, Direction::Prograde).unwrap();
         let h = cross(r1, sol.v1);
-        assert!(h[2] > 0.0, "hz should be positive for prograde, got {}", h[2]);
+        assert!(
+            h[2] > 0.0,
+            "hz should be positive for prograde, got {}",
+            h[2]
+        );
     }
 
     #[test]
     fn retrograde_negative_hz() {
-        // Retrograde orbit: hz < 0
+        // Retrograde orbit: hz = dot(r1×r2, r1×v1) < 0
+        // Same geometric angle as prograde (90°), but opposite direction of travel.
         let mu = 1.0;
         let r1 = [1.0, 0.0, 0.0];
         let r2 = [0.0, 1.0, 0.0];
-        let sol = lambert(mu, r1, r2, 3.0 * PI / 2.0, 0, Direction::Retrograde).unwrap();
+        let sol = lambert(mu, r1, r2, PI / 2.0, 0, Direction::Retrograde).unwrap();
         let h = cross(r1, sol.v1);
-        assert!(h[2] < 0.0, "hz should be negative for retrograde, got {}", h[2]);
+        assert!(
+            h[2] < 0.0,
+            "hz should be negative for retrograde, got {}",
+            h[2]
+        );
     }
 
     #[test]
@@ -598,7 +666,10 @@ mod tests {
         let r2 = [0.0, 42164.0, 0.0];
         let sol = lambert(mu, r1, r2, 5.0 * 3600.0, 0, Direction::Prograde).unwrap();
         let speed = mag(sol.v1);
-        assert!((7.0..=12.0).contains(&speed), "LEO departure speed {speed:.2} km/s out of range");
+        assert!(
+            (7.0..=12.0).contains(&speed),
+            "LEO departure speed {speed:.2} km/s out of range"
+        );
     }
 
     #[test]
@@ -617,9 +688,18 @@ mod tests {
     fn invalid_mu() {
         let r1 = [1.0, 0.0, 0.0];
         let r2 = [0.0, 1.0, 0.0];
-        assert!(matches!(lambert(0.0, r1, r2, 1.0, 0, Direction::Prograde), Err(LambertError::InvalidInput(_))));
-        assert!(matches!(lambert(-1.0, r1, r2, 1.0, 0, Direction::Prograde), Err(LambertError::InvalidInput(_))));
-        assert!(matches!(lambert(f64::NAN, r1, r2, 1.0, 0, Direction::Prograde), Err(LambertError::InvalidInput(_))));
+        assert!(matches!(
+            lambert(0.0, r1, r2, 1.0, 0, Direction::Prograde),
+            Err(LambertError::InvalidInput(_))
+        ));
+        assert!(matches!(
+            lambert(-1.0, r1, r2, 1.0, 0, Direction::Prograde),
+            Err(LambertError::InvalidInput(_))
+        ));
+        assert!(matches!(
+            lambert(f64::NAN, r1, r2, 1.0, 0, Direction::Prograde),
+            Err(LambertError::InvalidInput(_))
+        ));
     }
 
     #[test]
@@ -627,8 +707,14 @@ mod tests {
         let mu = 1.0;
         let r1 = [1.0, 0.0, 0.0];
         let r2 = [0.0, 1.0, 0.0];
-        assert!(matches!(lambert(mu, r1, r2, 0.0, 0, Direction::Prograde), Err(LambertError::InvalidInput(_))));
-        assert!(matches!(lambert(mu, r1, r2, -1.0, 0, Direction::Prograde), Err(LambertError::InvalidInput(_))));
+        assert!(matches!(
+            lambert(mu, r1, r2, 0.0, 0, Direction::Prograde),
+            Err(LambertError::InvalidInput(_))
+        ));
+        assert!(matches!(
+            lambert(mu, r1, r2, -1.0, 0, Direction::Prograde),
+            Err(LambertError::InvalidInput(_))
+        ));
     }
 
     #[test]
@@ -649,7 +735,11 @@ mod tests {
         let r1 = [1.0, 0.0, 0.0];
         let r2 = [0.0, 0.8, 0.6];
         let sol = lambert(mu, r1, r2, PI / 2.0, 0, Direction::Prograde).unwrap();
-        assert!(sol.v1[2].abs() > 1e-6, "Expected 3D velocity, got v1z={}", sol.v1[2]);
+        assert!(
+            sol.v1[2].abs() > 1e-6,
+            "Expected 3D velocity, got v1z={}",
+            sol.v1[2]
+        );
         // Energy still conserved
         let e1 = energy(r1, sol.v1, mu);
         let e2 = energy(r2, sol.v2, mu);
@@ -669,6 +759,94 @@ mod tests {
         // Energy: 1-rev should be on a different (more circular) orbit
         let e0 = energy(r1, sol0.v1, mu);
         let e1 = energy(r1, sol1.v1, mu);
-        assert!((e0 - e1).abs() > 1e-6, "0-rev and 1-rev should have different energies");
+        assert!(
+            (e0 - e1).abs() > 1e-6,
+            "0-rev and 1-rev should have different energies"
+        );
+    }
+
+    #[test]
+    fn lambert_wraps_gooding_lambert() {
+        // Verify lambert() and gooding_lambert() produce identical results
+        // for the same physical inputs.
+        let mu = 398600.4418;
+        let r1 = [6678.0, 0.0, 0.0];
+        let r2 = [0.0, 42164.0, 0.0];
+        let tof = 5.0 * 3600.0;
+
+        // lambert() via wrapper
+        let sol = lambert(mu, r1, r2, tof, 0, Direction::Prograde).unwrap();
+
+        // gooding_lambert() directly
+        let mut v1 = [0.0_f64; 3];
+        let mut v2 = [0.0_f64; 3];
+        let code = gooding_lambert(mu, &r1, &r2, 0, tof, &mut v1, &mut v2);
+        assert!(code > 0);
+
+        // Must be bitwise identical (same code path, no floating-point divergence)
+        assert_eq!(
+            sol.v1, v1,
+            "v1 mismatch between lambert() and gooding_lambert()"
+        );
+        assert_eq!(
+            sol.v2, v2,
+            "v2 mismatch between lambert() and gooding_lambert()"
+        );
+    }
+
+    #[test]
+    fn lambert_retrograde_physics() {
+        // Retrograde orbit: verify energy conservation, angular momentum
+        // conservation, and angular momentum direction (hz < 0).
+        let mu = 1.0;
+        let r1 = [1.0, 0.0, 0.0];
+        let r2 = [0.0, 1.0, 0.0];
+        let tof = PI / 2.0;
+
+        let sol = lambert(mu, r1, r2, tof, 0, Direction::Retrograde).unwrap();
+
+        // Energy conserved between endpoints
+        let e1 = energy(r1, sol.v1, mu);
+        let e2 = energy(r2, sol.v2, mu);
+        assert!((e1 - e2).abs() < 1e-12, "energy: {e1} vs {e2}");
+
+        // Angular momentum conserved
+        let h1 = cross(r1, sol.v1);
+        let h2 = cross(r2, sol.v2);
+        for i in 0..3 {
+            assert!(
+                (h1[i] - h2[i]).abs() < 1e-12,
+                "h[{i}]: {:.6e} vs {:.6e}",
+                h1[i],
+                h2[i]
+            );
+        }
+
+        // h_ref = r1 × r2 points in +z; retrograde means dot(h_ref, h_actual) < 0
+        let h_ref = cross(r1, r2);
+        let dot_h = h_ref[0] * h1[0] + h_ref[1] * h1[1] + h_ref[2] * h1[2];
+        assert!(
+            dot_h < 0.0,
+            "dot(r1×r2, r1×v1) should be negative for retrograde, got {}",
+            dot_h
+        );
+    }
+
+    #[test]
+    fn lambert_wraps_gooding_lambert_multirev() {
+        let mu = 1.0;
+        let r1 = [1.0, 0.0, 0.0];
+        let r2 = [-1.0, 0.1, 0.0];
+        let tof = 20.0;
+
+        let sol = lambert(mu, r1, r2, tof, 1, Direction::Prograde).unwrap();
+
+        let mut v1 = [0.0_f64; 3];
+        let mut v2 = [0.0_f64; 3];
+        let code = gooding_lambert(mu, &r1, &r2, 1, tof, &mut v1, &mut v2);
+        assert!(code > 0);
+
+        assert_eq!(sol.v1, v1);
+        assert_eq!(sol.v2, v2);
     }
 }

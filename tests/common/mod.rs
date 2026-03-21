@@ -35,7 +35,11 @@ pub fn rand_r(s: &mut u64, r_lo: f64, r_hi: f64) -> [f64; 3] {
     let r = rand_f64(s, r_lo, r_hi);
     let theta = rand_f64(s, 0.0, PI);
     let phi = rand_f64(s, 0.0, 2.0 * PI);
-    [r * theta.sin() * phi.cos(), r * theta.sin() * phi.sin(), r * theta.cos()]
+    [
+        r * theta.sin() * phi.cos(),
+        r * theta.sin() * phi.sin(),
+        r * theta.cos(),
+    ]
 }
 
 // ── Geometry helpers ─────────────────────────────────────────────────────────
