@@ -151,6 +151,6 @@ implementation (requires a C compiler at build time; not needed for library use)
 
 ## Algorithm Reference
 
-See [docs/algorithms/gooding-lambert.md](algorithms/gooding-lambert.md) for a detailed
+See [docs/gooding-lambert.md](gooding-lambert.md) for a detailed
 description of the four-layer algorithm (tlamb → xlamb → vlamb → lambert), Gooding's
 dimensionless orbit parameter x, the Householder iteration, and the velocity recovery scheme.

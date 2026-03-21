@@ -427,6 +427,7 @@ attributable to the asymmetry rho.
 1. **Gooding, R. H.** (1990). "A procedure for the solution of Lambert's orbital
    boundary-value problem." *Celestial Mechanics and Dynamical Astronomy*, **48**(2), 145--165.
    DOI: [10.1007/BF00049511](https://doi.org/10.1007/BF00049511)
+   ([PDF](gooding-paper.pdf))
 
 2. **Izzo, D.** (2015). "Revisiting Lambert's problem." *Celestial Mechanics and Dynamical
    Astronomy*, **121**(1), 1--15.

@@ -13,7 +13,7 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-gooding-lambert = "0.1.0"
+gooding-lambert = "0.1.1"
 ```
 
 ## Quick Start
@@ -50,6 +50,7 @@ most robust classical Lambert solver available.
 - [API Documentation](https://docs.rs/gooding-lambert)
 - [Algorithm Details](docs/gooding-lambert.md)
 - [LLM Quick-Start Guide](docs/llm-context.md)
+- [Gooding (1990) Paper](docs/gooding-paper.pdf)
 
 ## Development
 

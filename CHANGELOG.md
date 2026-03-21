@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-03-20
+
+### Fixed
+
+- Retrograde case error inherited from reference C code — corrected root cause
+  and cleaned up cascading compensating errors
+
+### Added
+
+- Gooding (1990) paper included in `docs/` for reference
+- Cross-validation tests against Gooding's original Fortran via C translation
+
 ## [0.1.0] - 2026-03-01
 
 ### Added
@@ -21,5 +33,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Algorithm reference documentation (`docs/gooding-lambert.md`)
 - LLM quick-start guide (`docs/llm-context.md`)
 
-[Unreleased]: https://github.com/nstrange/gooding-lambert/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/nstrange/gooding-lambert/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/nstrange/gooding-lambert/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/nstrange/gooding-lambert/releases/tag/v0.1.0
