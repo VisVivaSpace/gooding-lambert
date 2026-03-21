@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-03-21
+
 ### Added
 
 - `MultiRevPeriod` enum (`LongPeriod`, `ShortPeriod`) — `lambert()` now accepts
@@ -70,6 +72,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Algorithm reference documentation (`docs/gooding-lambert.md`)
 - LLM quick-start guide (`docs/llm-context.md`)
 
-[Unreleased]: https://github.com/VisVivaSpace/gooding-lambert/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/VisVivaSpace/gooding-lambert/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/VisVivaSpace/gooding-lambert/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/VisVivaSpace/gooding-lambert/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/VisVivaSpace/gooding-lambert/releases/tag/v0.1.0
